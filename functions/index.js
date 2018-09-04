@@ -1,16 +1,12 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const app = express();
 const config = require("./config");
 const jwt = require("express-jwt");
 const jwks = require("jwks-rsa");
 const firebaseAdmin = require("firebase-admin");
+const functions = require("firebase-functions");
+const cors = require("cors");
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cors());
-
+// Auth0 athentication middleware
 const jwtCheck = jwt({
     secret: jwks.expressJwtSecret({
         cache: true,
@@ -30,45 +26,33 @@ firebaseAdmin.initializeApp({
     databaseURL: config.FIREBASE_DB
 });
 
-module.exports = function (app) {
-    // Auth0 athentication middleware
-    const jwtCheck = jwt({
-        secret: jwks.expressJwtSecret({
-            cache: true,
-            rateLimit: true,
-            jwksRequestsPerMinute: 5,
-            jwksUri: `https://${config.AUTH0_DOMAIN}/.well-known/jwks.json`
-        }),
-        audience: config.AUTH0_API_AUDIENCE,
-        issuer: `https://${config.AUTH0_DOMAIN}/`,
-        algorithm: "RS256"
-    });
+const app1 = express();
+app1.use(cors({ origin: true }))
+// GET object containing Firebase custom token
+app1.get("/auth", jwtCheck, (req, res) => {
+    console.log(req);
+    // Create UID from authenticated Auth0 user
+    const uid = req.user.sub;
+    // Mint token using Firebase Admin SDK
+    firebaseAdmin
+        .auth()
+        .createCustomToken(uid)
+        .then(customToken =>
+            // Response must be an object or Firebase errors
+            res.json({ firebaseToken: customToken })
+        )
+        .catch(err =>
+            res.status(500).send({
+                message: "Something went wrong acquiring a Firebase token.",
+                error: err
+            })
+        );
+});
 
-    // Initialize Firebase Admin with service account
-    const serviceAccount = require(config.FIREBASE_KEY);
-    firebaseAdmin.initializeApp({
-        credential: firebaseAdmin.credential.cert(serviceAccount),
-        databaseURL: config.FIREBASE_DB
-    });
+const api1 = functions.https.onRequest(app1);
 
-    // GET object containing Firebase custom token
-    app.get("/auth/firebase", jwtCheck, (req, res) => {
-        console.log(req);
-        // Create UID from authenticated Auth0 user
-        const uid = req.user.sub;
-        // Mint token using Firebase Admin SDK
-        firebaseAdmin
-            .auth()
-            .createCustomToken(uid)
-            .then(customToken =>
-                // Response must be an object or Firebase errors
-                res.json({ firebaseToken: customToken })
-            )
-            .catch(err =>
-                res.status(500).send({
-                    message: "Something went wrong acquiring a Firebase token.",
-                    error: err
-                })
-            );
-    });
+module.exports = {
+    api1
 };
+
+
