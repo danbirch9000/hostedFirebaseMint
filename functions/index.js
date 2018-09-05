@@ -26,10 +26,10 @@ firebaseAdmin.initializeApp({
     databaseURL: config.FIREBASE_DB
 });
 
-const app1 = express();
-app1.use(cors({ origin: true }))
+const app = express();
+app.use(cors({ origin: true }))
 // GET object containing Firebase custom token
-app1.get("/auth", jwtCheck, (req, res) => {
+app.get("/auth", jwtCheck, (req, res) => {
     console.log(req);
     // Create UID from authenticated Auth0 user
     const uid = req.user.sub;
@@ -49,10 +49,10 @@ app1.get("/auth", jwtCheck, (req, res) => {
         );
 });
 
-const api1 = functions.https.onRequest(app1);
+const api = functions.https.onRequest(app);
 
 module.exports = {
-    api1
+    api
 };
 
 
